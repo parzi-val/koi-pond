@@ -1,0 +1,44 @@
+train (30000, 400, 640) val (512, 400, 640) bits 248 device cuda NVIDIA A100-SXM4-40GB
+params 2.96M
+step    200  s 0.02  loss 0.6932  val acc clean 0.5030 (ok 0.00) | mid-aug 0.5002 (ok 0.00) | full-aug 0.5018 (ok 0.00)  0.167s/step
+step   1000  s 0.08  loss 0.6913  val acc clean 0.5150 (ok 0.00) | mid-aug 0.4978 (ok 0.00) | full-aug 0.4975 (ok 0.00)  0.151s/step
+step   2000  s 0.17  loss 0.3368  val acc clean 0.6832 (ok 0.00) | mid-aug 0.6399 (ok 0.00) | full-aug 0.5083 (ok 0.00)  0.149s/step
+step   3000  s 0.25  loss 0.2031  val acc clean 0.8101 (ok 0.00) | mid-aug 0.7815 (ok 0.00) | full-aug 0.5274 (ok 0.00)  0.148s/step
+step   4000  s 0.33  loss 0.0458  val acc clean 0.8741 (ok 0.00) | mid-aug 0.9375 (ok 0.00) | full-aug 0.5620 (ok 0.00)  0.148s/step
+step   5000  s 0.42  loss 0.0424  val acc clean 0.9718 (ok 0.05) | mid-aug 0.9698 (ok 0.04) | full-aug 0.6180 (ok 0.00)  0.148s/step
+step   6000  s 0.50  loss 0.0161  val acc clean 0.9830 (ok 0.45) | mid-aug 0.9897 (ok 0.79) | full-aug 0.6991 (ok 0.08)  0.147s/step
+step   7000  s 0.58  loss 0.0124  val acc clean 0.9903 (ok 0.85) | mid-aug 0.9918 (ok 0.93) | full-aug 0.7659 (ok 0.14)  0.147s/step
+step   8000  s 0.67  loss 0.0124  val acc clean 0.9916 (ok 0.92) | mid-aug 0.9921 (ok 0.95) | full-aug 0.8242 (ok 0.21)  0.147s/step
+step   9000  s 0.75  loss 0.0110  val acc clean 0.9601 (ok 0.24) | mid-aug 0.9875 (ok 0.75) | full-aug 0.8617 (ok 0.20)  0.147s/step
+step  10000  s 0.83  loss 0.0191  val acc clean 0.9952 (ok 1.00) | mid-aug 0.9956 (ok 1.00) | full-aug 0.9452 (ok 0.48)  0.147s/step
+step  11000  s 0.92  loss 0.0203  val acc clean 0.9959 (ok 1.00) | mid-aug 0.9960 (ok 1.00) | full-aug 0.9653 (ok 0.58)  0.147s/step
+step  12000  s 1.00  loss 0.0676  val acc clean 0.9914 (ok 0.91) | mid-aug 0.9918 (ok 0.92) | full-aug 0.9711 (ok 0.53)  0.147s/step
+step  13000  s 1.00  loss 0.0482  val acc clean 0.9918 (ok 0.94) | mid-aug 0.9918 (ok 0.94) | full-aug 0.9763 (ok 0.60)  0.147s/step
+step  14000  s 1.00  loss 0.0307  val acc clean 0.9918 (ok 0.93) | mid-aug 0.9919 (ok 0.93) | full-aug 0.9793 (ok 0.63)  0.147s/step
+step  15000  s 1.00  loss 0.0408  val acc clean 0.9920 (ok 0.94) | mid-aug 0.9920 (ok 0.94) | full-aug 0.9798 (ok 0.63)  0.147s/step
+step  16000  s 1.00  loss 0.0520  val acc clean 0.9919 (ok 0.94) | mid-aug 0.9919 (ok 0.94) | full-aug 0.9810 (ok 0.64)  0.147s/step
+step  17000  s 1.00  loss 0.0460  val acc clean 0.9960 (ok 1.00) | mid-aug 0.9960 (ok 1.00) | full-aug 0.9862 (ok 0.79)  0.147s/step
+step  18000  s 1.00  loss 0.0261  val acc clean 0.9959 (ok 1.00) | mid-aug 0.9959 (ok 1.00) | full-aug 0.9853 (ok 0.77)  0.147s/step
+step  19000  s 1.00  loss 0.0469  val acc clean 0.9959 (ok 1.00) | mid-aug 0.9959 (ok 1.00) | full-aug 0.9872 (ok 0.81)  0.147s/step
+step  20000  s 1.00  loss 0.0174  val acc clean 0.9960 (ok 1.00) | mid-aug 0.9960 (ok 1.00) | full-aug 0.9876 (ok 0.79)  0.147s/step
+step  21000  s 1.00  loss 0.0196  val acc clean 0.9960 (ok 1.00) | mid-aug 0.9960 (ok 1.00) | full-aug 0.9881 (ok 0.81)  0.147s/step
+step  22000  s 1.00  loss 0.0218  val acc clean 0.9979 (ok 1.00) | mid-aug 0.9978 (ok 1.00) | full-aug 0.9902 (ok 0.84)  0.147s/step
+step  23000  s 1.00  loss 0.0211  val acc clean 0.9979 (ok 1.00) | mid-aug 0.9979 (ok 1.00) | full-aug 0.9904 (ok 0.85)  0.147s/step
+step  24000  s 1.00  loss 0.0129  val acc clean 0.9980 (ok 1.00) | mid-aug 0.9981 (ok 1.00) | full-aug 0.9905 (ok 0.86)  0.147s/step
+step  25000  s 1.00  loss 0.0337  val acc clean 0.9979 (ok 1.00) | mid-aug 0.9979 (ok 1.00) | full-aug 0.9909 (ok 0.85)  0.147s/step
+step  26000  s 1.00  loss 0.0188  val acc clean 0.9980 (ok 1.00) | mid-aug 0.9980 (ok 1.00) | full-aug 0.9913 (ok 0.86)  0.147s/step
+step  27000  s 1.00  loss 0.0060  val acc clean 0.9980 (ok 1.00) | mid-aug 0.9980 (ok 1.00) | full-aug 0.9913 (ok 0.86)  0.147s/step
+step  28000  s 1.00  loss 0.0270  val acc clean 0.9979 (ok 1.00) | mid-aug 0.9980 (ok 1.00) | full-aug 0.9915 (ok 0.86)  0.147s/step
+step  29000  s 1.00  loss 0.0062  val acc clean 0.9980 (ok 1.00) | mid-aug 0.9979 (ok 1.00) | full-aug 0.9917 (ok 0.86)  0.147s/step
+step  30000  s 1.00  loss 0.0157  val acc clean 0.9979 (ok 1.00) | mid-aug 0.9979 (ok 1.00) | full-aug 0.9918 (ok 0.88)  0.147s/step
+step  31000  s 1.00  loss 0.0099  val acc clean 0.9979 (ok 1.00) | mid-aug 0.9979 (ok 1.00) | full-aug 0.9920 (ok 0.87)  0.147s/step
+step  32000  s 1.00  loss 0.0096  val acc clean 0.9979 (ok 1.00) | mid-aug 0.9979 (ok 1.00) | full-aug 0.9921 (ok 0.88)  0.147s/step
+step  33000  s 1.00  loss 0.0205  val acc clean 0.9980 (ok 1.00) | mid-aug 0.9979 (ok 1.00) | full-aug 0.9922 (ok 0.88)  0.147s/step
+step  34000  s 1.00  loss 0.0303  val acc clean 0.9978 (ok 1.00) | mid-aug 0.9978 (ok 1.00) | full-aug 0.9921 (ok 0.87)  0.147s/step
+step  35000  s 1.00  loss 0.0324  val acc clean 0.9981 (ok 1.00) | mid-aug 0.9981 (ok 1.00) | full-aug 0.9925 (ok 0.88)  0.147s/step
+step  36000  s 1.00  loss 0.0214  val acc clean 0.9983 (ok 1.00) | mid-aug 0.9984 (ok 1.00) | full-aug 0.9927 (ok 0.88)  0.147s/step
+step  37000  s 1.00  loss 0.0020  val acc clean 1.0000 (ok 1.00) | mid-aug 0.9999 (ok 1.00) | full-aug 0.9942 (ok 0.89)  0.147s/step
+step  38000  s 1.00  loss 0.0070  val acc clean 1.0000 (ok 1.00) | mid-aug 1.0000 (ok 1.00) | full-aug 0.9943 (ok 0.89)  0.147s/step
+step  39000  s 1.00  loss 0.0126  val acc clean 1.0000 (ok 1.00) | mid-aug 1.0000 (ok 1.00) | full-aug 0.9943 (ok 0.89)  0.147s/step
+step  40000  s 1.00  loss 0.0053  val acc clean 1.0000 (ok 1.00) | mid-aug 1.0000 (ok 1.00) | full-aug 0.9944 (ok 0.89)  0.147s/step
+done

@@ -1,0 +1,15 @@
+# training data, renders, weights (regenerable / too big for git)
+data/
+out/
+*.pt
+*.npz
+__pycache__/
+
+# android build output
+android/.gradle/
+android/.kotlin/
+android/build/
+android/app/build/
+android/local.properties
+android/*.apk
+.idea/
