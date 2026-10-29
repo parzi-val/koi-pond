@@ -1,0 +1,7 @@
+numpy
+opencv-python
+scipy
+scikit-image
+pillow
+reedsolo
+torch  # learned decoders only (fish_nn*.py, nn/)

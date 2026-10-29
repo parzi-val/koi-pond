@@ -1,7 +1,7 @@
 # training data and renders (regenerable); weights go through LFS (.gitattributes)
 data/
 out/
-nn/*_live.pt
+research/nn/*_live.pt
 *.npz
 __pycache__/
 
