@@ -6,6 +6,15 @@ rather than a barcode.
 
 <p align="center"><img src="android/app/src/main/assets/default_pond.png" width="420" alt="A koi pond that encodes &quot;Hello world&quot;"></p>
 
+Earlier formats from the same project, each carrying its own payload:
+
+<p align="center">
+  <img src="docs/fish.jpg" width="32%" alt="Engraved fish">
+  <img src="docs/fish_wash.jpg" width="32%" alt="Watercolour fish">
+  <img src="docs/coral.jpg" width="20%" alt="Topological coral">
+</p>
+<p align="center"><sub>Engraved fish (24 bytes) · watercolour fish (24 bytes) · topological coral (8 bytes)</sub></p>
+
 ## How it works
 
 - **One bit per scale.** Each koi's body is a grid of scales, and each scale has a small group of
@@ -68,26 +77,27 @@ These were trained on the single-fish format (`fish.py`), not the pond yet.
   rendered fish for 40k steps on an A100. `nn/viz2.py` and `nn/layers2.py` show what each layer
   attends to. Layer 1 mostly looks at its own scale.
 
-Single-fish benchmark: the same 30 fish (24-byte payload + 7 parity bytes) for each decoder, as
-the fraction decoded exactly. "Classical" is `fish.py`'s template-tracking reader, and the
-watercolour fish uses its own renders with that same reader.
+Benchmark of the earlier formats, as the fraction decoded exactly. The fish columns use the same
+30 fish (24-byte payload + 7 parity bytes). "Classical" is `fish.py`'s template-tracking reader,
+and the watercolour fish uses its own renders with that same reader. The coral is 40 renders
+carrying 8 bytes + 4 parity bytes, so it has a much easier job.
 
-| Distortion | Classical | Watercolour | v1 CNN | v2 BitReader |
-| --- | --- | --- | --- | --- |
-| none | 1.00 | 1.00 | 0.00 | 1.00 |
-| scale 0.5 / 0.35 | 1.00 / 0.93 | 1.00 / 0.87 | 0.00 / 0.00 | 1.00 / 1.00 |
-| rotate 15° / 45° / 135° | 1.00 / 1.00 / 1.00 | 1.00 / 1.00 / 1.00 | 0.00 / 0.00 / 0.00 | 0.97 / 0.00 / 0.00 |
-| JPEG q25 / 10 | 1.00 / 1.00 | 1.00 / 0.87 | 0.00 / 0.00 | 1.00 / 1.00 |
-| blur σ2 / 3 | 1.00 / 0.83 | 1.00 / 0.50 | 0.00 / 0.00 | 1.00 / 1.00 |
-| noise 16 / 32 | 1.00 / 1.00 | 0.97 / 0.47 | 0.00 / 0.00 | 1.00 / 1.00 |
-| perspective 0.05 / 0.1 / 0.2 | 0.97 / 0.53 / 0.00 | 0.97 / 0.47 / 0.00 | 0.00 / 0.00 / 0.00 | 1.00 / 1.00 / 0.97 |
-| lighting 0.5 / 0.7 | 1.00 / 1.00 | 0.97 / 0.73 | 0.00 / 0.00 | 1.00 / 1.00 |
-| crop 10% / 20% | 0.80 / 0.50 | 0.70 / 0.50 | 0.00 / 0.00 | 1.00 / 0.40 |
-| simulated phone photo 1 / 2 / 3 | 1.00 / 0.80 / 0.17 | 1.00 / 0.73 / 0.00 | 0.00 / 0.00 / 0.00 | 1.00 / 0.90 / 0.03 |
+| Distortion | Coral | Classical fish | Watercolour fish | v1 CNN | v2 BitReader |
+| --- | --- | --- | --- | --- | --- |
+| none | 1.00 | 1.00 | 1.00 | 0.00 | 1.00 |
+| scale 0.5 / 0.35 | 1.00 / 1.00 | 1.00 / 0.93 | 1.00 / 0.87 | 0.00 / 0.00 | 1.00 / 1.00 |
+| rotate 15° / 45° / 135° | 1.00 / 1.00 / 1.00 | 1.00 / 1.00 / 1.00 | 1.00 / 1.00 / 1.00 | 0.00 / 0.00 / 0.00 | 0.97 / 0.00 / 0.00 |
+| JPEG q25 / 10 | 1.00 / 1.00 | 1.00 / 1.00 | 1.00 / 0.87 | 0.00 / 0.00 | 1.00 / 1.00 |
+| blur σ2 / 3 | 1.00 / 0.83 | 1.00 / 0.83 | 1.00 / 0.50 | 0.00 / 0.00 | 1.00 / 1.00 |
+| noise 16 / 32 | 1.00 / 1.00 | 1.00 / 1.00 | 0.97 / 0.47 | 0.00 / 0.00 | 1.00 / 1.00 |
+| perspective 0.05 / 0.1 / 0.2 | 1.00 / 1.00 / 1.00 | 0.97 / 0.53 / 0.00 | 0.97 / 0.47 / 0.00 | 0.00 / 0.00 / 0.00 | 1.00 / 1.00 / 0.97 |
+| lighting 0.5 / 0.7 | 1.00 / 1.00 | 1.00 / 1.00 | 0.97 / 0.73 | 0.00 / 0.00 | 1.00 / 1.00 |
+| crop 10% / 20% | 0.50 / 0.15 | 0.80 / 0.50 | 0.70 / 0.50 | 0.00 / 0.00 | 1.00 / 0.40 |
+| simulated phone photo 1 / 2 / 3 | 1.00 / 1.00 / 0.85 | 1.00 / 0.80 / 0.17 | 1.00 / 0.73 / 0.00 | 0.00 / 0.00 / 0.00 | 1.00 / 0.90 / 0.03 |
 
 v1 never decodes a whole fish: its bit error rate sits around 12%, more than the 7 parity bytes
 can fix. v2 gets about 0.4% (roughly one bit per fish) on almost everything and beats the
-classical reader on perspective, blur and crop. It fails at 45° and beyond, because training only
+classical fish reader on perspective, blur and crop. It fails at 45° and beyond, because training only
 rotated the fish by up to ±30°.
 
 `nn/gen_data.py` renders the training set. The training scripts default to Colab's `/content` paths.
