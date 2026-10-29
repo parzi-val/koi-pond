@@ -1,7 +1,7 @@
-# training data, renders, weights (regenerable / too big for git)
+# training data and renders (regenerable); weights go through LFS (.gitattributes)
 data/
 out/
-*.pt
+nn/*_live.pt
 *.npz
 __pycache__/
 
