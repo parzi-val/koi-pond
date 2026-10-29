@@ -104,18 +104,26 @@ def encode(bits, z):
     return img  # ponytail: gives up after 6 styles; shows up as a clean-decode failure in the harness
 
 
-def _render(bits, z):
-    rng = np.random.default_rng(z)
+def _words(bits):
+    """Outer codeword bits -> each koi's 176 bits: [0xA0 | index] + chunk + 4 inner parity bytes."""
     code = np.packbits(bits)
-    words = [np.unpackbits(np.frombuffer(bytes(_RS.encode(bytes([0xA0 | f]) + code[f::NF].tobytes())), np.uint8))
-             for f in range(NF)]
+    return [np.unpackbits(np.frombuffer(bytes(_RS.encode(bytes([0xA0 | f]) + code[f::NF].tobytes())), np.uint8))
+            for f in range(NF)]
 
-    # --- layout: koi swim a ring head-first, in shuffled order ---------------------------
+
+def _layout(rng):
+    """Koi swim a ring head-first, in shuffled order; kois[f] carries chunk f. First draws from a render's rng."""
     ctr = np.full(2, S / 2)
     R0, phase, spin = rng.uniform(870, 910), rng.uniform(0, 2 * np.pi), rng.choice([-1, 1])
     slots = rng.permutation(NF)
-    kois = [_koi(rng, ctr, R0 + rng.uniform(-25, 25), phase + 2 * np.pi * slots[f] / NF + rng.uniform(-.05, .05), spin)
+    return [_koi(rng, ctr, R0 + rng.uniform(-25, 25), phase + 2 * np.pi * slots[f] / NF + rng.uniform(-.05, .05), spin)
             for f in range(NF)]
+
+
+def _render(bits, z):
+    rng = np.random.default_rng(z)
+    words = _words(bits)
+    ctr, kois = np.full(2, S / 2), _layout(rng)
 
     # --- ink layer: supersampled alpha, composited over the washes at the end ------------
     A = Image.new('L', (S * SS, S * SS), 0)
