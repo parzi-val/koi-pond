@@ -49,27 +49,58 @@ python koi.py                    # round-trip self-check on one pond
 python harness.py koi --n 12     # full benchmark, writes out/koi/
 ```
 
-`harness.py` takes any method module (`topo`, `fish`, `fish_wash`, `koi`, `fish_nn`, `fish_nn2`)
+`harness.py` takes any method module (`topo`, `fish`, `fish_wash`, `koi`, `koi_nn`, `fish_nn`, `fish_nn2`)
 and `--only jpeg blur ...` to run a subset of distortions.
 
-Koi pond benchmark (12 ponds, fraction decoded exactly):
+Koi pond benchmark (12 ponds, fraction decoded exactly). "Classical" is `koi.py`'s own reader;
+"learned" is `koi_nn.py`, the same front end with the strip reader described below.
 
-| Distortion | Levels → exact |
-| --- | --- |
-| none | 1.00 |
-| scale 0.75 / 0.5 / 0.35 | 1.00 / 1.00 / 0.00 |
-| rotate 15° / 45° / 135° | 1.00 / 1.00 / 1.00 |
-| JPEG q75 / 50 / 25 / 10 | 1.00 / 1.00 / 1.00 / 1.00 |
-| blur σ1 / 2 / 3 | 1.00 / 0.92 / 0.17 |
-| noise 8 / 16 / 32 | 1.00 / 1.00 / 1.00 |
-| perspective 0.05 / 0.1 / 0.2 | 1.00 / 0.92 / 0.17 |
-| lighting 0.3 / 0.5 / 0.7 | 1.00 / 1.00 / 1.00 |
-| crop 5% / 10% / 20% | 1.00 / 1.00 / 0.08 |
-| simulated phone photo 1 / 2 / 3 | 1.00 / 0.25 / 0.00 |
+| Distortion | Classical | Learned |
+| --- | --- | --- |
+| none | 1.00 | 1.00 |
+| scale 0.75 / 0.5 / 0.35 | 1.00 / 0.92 / 0.00 | 1.00 / 1.00 / 0.92 |
+| rotate 15° / 45° / 135° | 1.00 / 1.00 / 1.00 | 1.00 / 1.00 / 1.00 |
+| JPEG q75 / 50 / 25 / 10 | 1.00 / 1.00 / 1.00 / 1.00 | 1.00 / 1.00 / 1.00 / 1.00 |
+| blur σ1 / 2 / 3 | 1.00 / 1.00 / 0.42 | 1.00 / 1.00 / 0.92 |
+| noise 8 / 16 / 32 | 1.00 / 1.00 / 1.00 | 1.00 / 1.00 / 1.00 |
+| perspective 0.05 / 0.1 / 0.2 | 1.00 / 0.92 / 0.25 | 1.00 / 1.00 / 0.50 |
+| lighting 0.3 / 0.5 / 0.7 | 1.00 / 1.00 / 1.00 | 1.00 / 1.00 / 1.00 |
+| crop 5% / 10% / 20% | 1.00 / 1.00 / 0.08 | 1.00 / 1.00 / 0.08 |
+| simulated phone photo 1 / 2 / 3 | 1.00 / 0.42 / 0.00 | 1.00 / 0.83 / 0.25 |
+
+A 20% crop usually cuts two or more koi out of frame, which no reader can recover (the outer code
+survives losing one).
 
 ## Learned decoders
 
-These were trained on the single-fish format (`fish.py`), not the pond yet.
+### Koi pond strip reader
+
+`koi_nn.py` keeps the classical front end (find each koi's silhouette, fit its spine, pick the head
+end), unbends each koi into a 128×640 strip, and reads the strip with a v2-style BitReader (176 bit
+queries, 2.95M params, `nn/koinn.pt`).
+
+- **Data** (`nn/koi_data.py`): 3,000 ponds, each photographed 6 times through a random known warp
+  (any rotation, down to 0.3 scale, perspective, crop) and lighting, blur, noise and JPEG. The
+  classical front end runs on every view exactly as at decode time, and each koi it finds is
+  labelled with its true bits by mapping the true nose and tail through the warp: 86k strips.
+- **Training** (`nn/train_koi.py`): 40k steps at batch 128 on a Colab TPU v6e (Colab's `torch_tpu`,
+  `torch.compile(backend='tpu')`, about 0.08 s/step). It starts on mildly damaged views only:
+  thrown in at full difficulty, it settled on the constant header bits and never found the hatches.
+- **Finishing** (`nn/koi_eval.py`): the compiled TPU graph never writes BatchNorm's running stats
+  back, so they're recomputed eagerly before export.
+
+On 2,911 held-out strips from photographed views, the fraction of koi fully decoded (inner RS passes):
+
+| Photo severity | Learned | Classical |
+| --- | --- | --- |
+| mild (0–0.4) | 1.000 | 0.957 |
+| medium (0.4–0.7) | 1.000 | 0.612 |
+| harsh (0.7–1) | 0.940 | 0.280 |
+| all | 0.981 | 0.619 |
+
+The front end is now the weak link: on these views it finds only about 85% of the koi in frame.
+
+### Single fish
 
 - **v1** (`nn/train.py`, `fishnn.pt`): a CNN that reads the bits directly.
 - **v2 BitReader** (`nn/train2.py`, `fishnn2.pt`): an FPN backbone onto a 50×80 grid, then 248
@@ -103,9 +134,6 @@ rotated the fish by up to ±30°.
 `nn/gen_data.py` renders the training set. The training scripts default to Colab's `/content` paths.
 The training data (`research/data/`) and renders (`research/out/`) are not in git; they regenerate
 from the scripts.
-
-Next up is a pond reader: classical koi detection and spine fitting, then unbend each koi into a
-strip and read it with a v2-style model.
 
 ## Android app
 
