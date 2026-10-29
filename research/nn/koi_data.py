@@ -20,7 +20,7 @@ sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), '..'
 import koi, harness  # noqa: E402
 
 SH, SW, V_SPAN = 128, 640, 1.15
-SHARD = 2000  # strips per file
+SHARD = 450  # strips per file (~28 MB: under the Colab upload limit)
 
 
 def strip(ink, fr):

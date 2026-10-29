@@ -9,8 +9,6 @@ python train.py [train.npz val.npz out.pt steps]   (defaults: /content/...)
 import sys, os, time, math, glob
 import numpy as np, torch, torch.nn as nn, torch.nn.functional as F
 
-A = sys.argv[1:] if len(sys.argv) > 4 else ['/content/train_*.npz', '/content/val.npz', '/content/fishnn.pt', '30000']
-TRAIN, VAL, OUT, STEPS = A[0], A[1], A[2], int(A[3])
 dev = 'cuda' if torch.cuda.is_available() else 'cpu'
 
 
@@ -105,6 +103,8 @@ class Net(nn.Module):
 
 
 if __name__ == '__main__':
+    A = sys.argv[1:] if len(sys.argv) > 4 else ['/content/train_*.npz', '/content/val.npz', '/content/fishnn.pt', '30000']
+    TRAIN, VAL, OUT, STEPS = A[0], A[1], A[2], int(A[3])
     Xtr, Ytr = load(TRAIN)
     Xva, Yva = load(VAL)
     nbits = Ytr.shape[1]

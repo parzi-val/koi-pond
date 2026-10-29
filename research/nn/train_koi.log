@@ -1,0 +1,55 @@
+1000/3000 ponds  491s  koi in frame 33900 found 28693 matched 28489
+2000/3000 ponds  937s  koi in frame 67783 found 57570 matched 57177
+3000/3000 ponds  1353s  koi in frame 101827 found 86428 matched 85804
+WARNING: All log messages before absl::InitializeLog() is called are written to STDERR
+Successfully renamed PrivateUse1 backend to 'tpu'. Device: device(type='tpu')
+Registered Python module for 'tpu'.
+Device type: tpu, Device index: default
+Initializing TPU distributed runtime
+train (85804, 128, 640) (23584 easy, head end picked wrong on 0.19%) val (2911, 128, 640) bits 176 device tpu workers 32
+classical on val: bit acc 0.9233  inner RS ok 0.619
+params 2.95M
+resumed at step 4001
+/content/research/nn/train_koi.py:173: UserWarning: The .grad attribute of a Tensor that is not a leaf Tensor is being accessed. Its .grad attribute won't be populated during autograd.backward(). If you indeed want the .grad field to be populated for a non-leaf Tensor, use .retain_grad() on the non-leaf Tensor. If you access the non-leaf Tensor by mistake, make sure you access the leaf Tensor instead. See github.com/pytorch/pytorch/pull/30531 for more information. (Triggered internally at external/rules_python++pip+torch_tpu_pypi_2_14_0_314_torch/site-packages/torch/include/ATen/core/TensorBody.h:494.)
+  print(f'step {step:6d}  loss {loss.item():.4f}  val bit acc {acc:.4f}  inner RS ok {ok:.3f}  '
+step   5000  loss 0.0146  val bit acc 0.9514  inner RS ok 0.562  0.150s/step
+step   6000  loss 0.0235  val bit acc 0.9579  inner RS ok 0.660  0.116s/step
+step   7000  loss 0.0100  val bit acc 0.9954  inner RS ok 0.970  0.104s/step
+step   8000  loss 0.0146  val bit acc 0.9959  inner RS ok 0.974  0.098s/step
+step   9000  loss 0.0247  val bit acc 0.9962  inner RS ok 0.976  0.094s/step
+step  10000  loss 0.0090  val bit acc 0.9964  inner RS ok 0.977  0.092s/step
+step  11000  loss 0.0164  val bit acc 0.9965  inner RS ok 0.978  0.090s/step
+step  12000  loss 0.0094  val bit acc 0.9966  inner RS ok 0.977  0.089s/step
+step  13000  loss 0.0036  val bit acc 0.9966  inner RS ok 0.980  0.088s/step
+step  14000  loss 0.0187  val bit acc 0.9966  inner RS ok 0.979  0.087s/step
+step  15000  loss 0.0189  val bit acc 0.9966  inner RS ok 0.978  0.086s/step
+step  16000  loss 0.0029  val bit acc 0.9968  inner RS ok 0.979  0.086s/step
+step  17000  loss 0.0016  val bit acc 0.9968  inner RS ok 0.980  0.085s/step
+step  18000  loss 0.0046  val bit acc 0.9969  inner RS ok 0.982  0.085s/step
+step  19000  loss 0.0037  val bit acc 0.9970  inner RS ok 0.981  0.084s/step
+step  20000  loss 0.0018  val bit acc 0.9969  inner RS ok 0.980  0.084s/step
+step  21000  loss 0.0192  val bit acc 0.9970  inner RS ok 0.981  0.084s/step
+step  22000  loss 0.0094  val bit acc 0.9971  inner RS ok 0.981  0.083s/step
+step  23000  loss 0.0132  val bit acc 0.9969  inner RS ok 0.979  0.083s/step
+step  24000  loss 0.0024  val bit acc 0.9971  inner RS ok 0.982  0.083s/step
+step  25000  loss 0.0005  val bit acc 0.9971  inner RS ok 0.981  0.083s/step
+step  26000  loss 0.0078  val bit acc 0.9972  inner RS ok 0.981  0.083s/step
+step  27000  loss 0.0077  val bit acc 0.9972  inner RS ok 0.982  0.083s/step
+step  28000  loss 0.0031  val bit acc 0.9971  inner RS ok 0.983  0.083s/step
+step  29000  loss 0.0085  val bit acc 0.9971  inner RS ok 0.982  0.082s/step
+step  30000  loss 0.0021  val bit acc 0.9972  inner RS ok 0.981  0.082s/step
+step  31000  loss 0.0028  val bit acc 0.9972  inner RS ok 0.982  0.082s/step
+step  32000  loss 0.0100  val bit acc 0.9972  inner RS ok 0.982  0.082s/step
+step  33000  loss 0.0007  val bit acc 0.9972  inner RS ok 0.981  0.082s/step
+step  34000  loss 0.0088  val bit acc 0.9972  inner RS ok 0.982  0.082s/step
+step  35000  loss 0.0081  val bit acc 0.9972  inner RS ok 0.981  0.082s/step
+step  36000  loss 0.0010  val bit acc 0.9972  inner RS ok 0.983  0.082s/step
+step  37000  loss 0.0031  val bit acc 0.9972  inner RS ok 0.982  0.082s/step
+step  38000  loss 0.0059  val bit acc 0.9972  inner RS ok 0.982  0.082s/step
+step  39000  loss 0.0040  val bit acc 0.9972  inner RS ok 0.982  0.082s/step
+step  40000  loss 0.0098  val bit acc 0.9972  inner RS ok 0.982  0.082s/step
+done
+num_cache_hits=1119280 {99.9%}
+num_compilations=36
+peak_compilation_memory_bytes=unknown
+
