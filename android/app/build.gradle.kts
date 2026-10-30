@@ -15,6 +15,7 @@ android {
         targetSdk = 36
         versionCode = 1
         versionName = "1.0"
+        buildConfigField("boolean", "LAB", "false")
         ndk { abiFilters += "arm64-v8a" }  // ONNX Runtime is ~35 MB of natives per ABI; phones only (add x86_64 for an emulator)
     }
 
@@ -25,6 +26,16 @@ android {
             isMinifyEnabled = false
             signingConfig = signingConfigs.getByName("debug")
         }
+        // Koi Lab: the release build with a test screen instead of the app (scan log, copy, frames zip); installs alongside
+        create("lab") {
+            initWith(getByName("release"))
+            applicationIdSuffix = ".lab"
+            versionNameSuffix = "-lab"
+            isMinifyEnabled = true  // R8: ~24 MB of dex down to a few, so the APK fits a 30 MB upload
+            proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
+            buildConfigField("boolean", "LAB", "true")
+            matchingFallbacks += "release"
+        }
     }
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_11
@@ -32,6 +43,7 @@ android {
     }
     buildFeatures {
         compose = true
+        buildConfig = true
     }
     packaging { jniLibs.useLegacyPackaging = true }  // compress the natives: ~35 MB -> ~12 MB in the APK
     testOptions {

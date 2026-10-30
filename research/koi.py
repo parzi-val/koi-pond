@@ -14,7 +14,7 @@ becomes a block of erasures for the outer code.
 import numpy as np, cv2
 from PIL import Image, ImageDraw
 from reedsolo import RSCodec, ReedSolomonError
-from scipy.ndimage import median_filter, gaussian_filter1d
+from scipy.ndimage import median_filter, gaussian_filter1d, maximum_filter, minimum_filter, uniform_filter1d
 from fish import _wobble, _smooth, _odd, _COMBOS, ARC, HATCH
 
 S, SS = 2400, 2
@@ -22,6 +22,11 @@ PAPER, INK = np.array([255., 250., 240.]), np.array([24., 20., 18.])
 BOLD, THIN = 3.6, 1.3
 NF = 6                         # koi in the pond
 L_RNG, HW_RNG, P_RNG = (640, 700), (90, 110), (16, 22)
+# corner anchors: a bold ring + centre dot (a stepping stone with a carved bullseye) in each corner, like a QR
+# code's finder patterns; the decoder maps them to these points and unwarps the pond before looking for koi
+ANCHOR_M, ANCHOR_R, ANCHOR_W, ANCHOR_DOT = 125, 80, 20, 26
+ANCHORS = np.float32([[ANCHOR_M, ANCHOR_M], [S - ANCHOR_M, ANCHOR_M], [S - ANCHOR_M, S - ANCHOR_M], [ANCHOR_M, S - ANCHOR_M]])
+RECT = 1600  # side of the unwarped pond the decoder reads
 C_RNG, D_RNG, K_RNG = (.6, .75), (.6, .85), (.02, .04)
 COLS, U0, U1 = 24, .22, .88    # coded scale columns span body fraction U0..U1
 VM, DV_PX = .86, 15            # scales cover v in [-VM, VM]; minimum scale height in px
@@ -295,6 +300,12 @@ def _render(bits, z):
     clear = lambda pts, fr: (fr[np.clip(pts[:, 1] // q, 0, S // q - 1).astype(int),
                                 np.clip(pts[:, 0] // q, 0, S // q - 1).astype(int)] > 0).all()
 
+    for c_ in ANCHORS:  # anchors first: stones and reeds keep clear of them
+        cv2.circle(stone, tuple(int(v) for v in c_), ANCHOR_R + 8, 1, -1)
+        ring(c_, ANCHOR_R, ANCHOR_W)
+        disc(c_, ANCHOR_DOT)
+        cv2.circle(fp, tuple(int(v) // q for v in c_), (ANCHOR_R + 24) // q, 1, -1)
+
     # stone rim: rounded stones along the pond edge, wherever no koi or fin reaches
     per = np.concatenate([np.stack([np.linspace(0, S, 60), np.zeros(60)], -1), np.stack([np.full(60, S), np.linspace(0, S, 60)], -1),
                           np.stack([np.linspace(S, 0, 60), np.full(60, S)], -1), np.stack([np.zeros(60), np.linspace(S, 0, 60)], -1)])
@@ -404,14 +415,15 @@ def _render(bits, z):
 
 # --- decoder -----------------------------------------------------------------------------
 
-def _ink(img):
+def _ink(img, k=None):
+    """Darkness against the local background (a k x k closing; default: a little wider than any stroke)."""
     v = img.max(2).astype(np.float32) + 1  # value channel: pale colour washes all but vanish
-    k = _odd(max(7, min(v.shape) // 80))
+    k = k or _odd(max(7, min(v.shape) // 80))
     return np.clip(1 - v / cv2.morphologyEx(v, cv2.MORPH_CLOSE, np.ones((k, k), np.uint8)), 0, 1)
 
 
-def _koi_masks(ink):
-    """Bold strokes -> filled silhouettes, one per koi."""
+def _bold(ink):
+    """Bold strokes only: thin strokes erased, then a relative threshold and a small closing. -> (bold, k)."""
     h, w = ink.shape
     # erase strokes clearly thinner than the bold outline (any number of them) before judging boldness;
     # sized from the drawing itself (99th-percentile stroke half-width), not the canvas
@@ -422,7 +434,13 @@ def _koi_masks(ink):
     b = cv2.GaussianBlur(ink, (0, 0), max(1., min(h, w) / 1500))
     bold = (b > .5 * np.percentile(b, 99.7)).astype(np.uint8)
     k = _odd(max(3, min(h, w) // 600))
-    bold = cv2.morphologyEx(bold, cv2.MORPH_CLOSE, cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (k, k)))
+    return cv2.morphologyEx(bold, cv2.MORPH_CLOSE, cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (k, k))), k
+
+
+def _koi_masks(ink):
+    """Bold strokes -> filled silhouettes, one per koi."""
+    h, w = ink.shape
+    bold, k = _bold(ink)
     _, lab = cv2.connectedComponents(1 - bold, connectivity=4)
     border = np.unique(np.concatenate([lab[0], lab[-1], lab[:, 0], lab[:, -1]]))
     raw = (bold | ~np.isin(lab, border)).astype(np.uint8)
@@ -440,6 +458,95 @@ def _koi_masks(ink):
     # that merely touches the body (JPEG ringing can make tail-ray roots read bold)
     return [raw & cv2.dilate((lab == i + 1).astype(np.uint8), np.ones((5, 5), np.uint8))
             for i in np.nonzero(areas > max(.35 * areas.max(), 1e-3 * h * w))[0]]
+
+
+RING = (845, 935)  # spine radius of every koi (R0 870..910, +-25 per koi), canvas px
+
+
+def _flanks(P, lo, hi, g, nth):
+    """Raw flanks (first / last bold row per angle) -> smooth ones. Fin roots and pads push a flank outward, outline
+    gaps let it fall in onto the scales, each over a narrow span of angle; a koi's real flank is smooth. A broad
+    median drops both, a running mean smooths what's left (picked on real phone photos of a screen)."""
+    A = lambda x: int(x * nth / (2 * np.pi)) | 1
+    return [uniform_filter1d(median_filter(f, A(.25), mode='wrap'), A(.1), mode='wrap') for f in (lo, hi)]
+
+
+def _pond_masks(ink):
+    """Unwarped pond: closed outlines where they hold (exact), ring silhouettes for the koi whose outline leaked.
+    Only the disc the koi swim in counts: whatever got warped in past the pond's edge (a dark bezel, window chrome)
+    would otherwise set the bold threshold."""
+    n = ink.shape[0]
+    yy, xx = np.mgrid[:n, :n] - n / 2
+    ink = ink * (np.hypot(xx, yy) < 1120 * n / S)
+    masks = _koi_masks(ink)
+    return masks + [m for m in _ring_masks(ink) if not any((m & k).sum() > .3 * m.sum() for k in masks)]
+
+
+def _ring_masks(ink):
+    """Silhouettes on an unwarped pond (RECT px), from the layout instead of closed outlines: every koi swims the
+    ring, so unroll the band around it and, per angle, take the innermost and outermost bold pixel as the two flanks.
+    A koi is a long run of angles with a body-wide gap between them; a broken outline only costs a few columns."""
+    n = ink.shape[0]
+    g, c = n / S, n / 2
+    bold = _bold(ink)[0].astype(np.float32)
+    r = np.arange(int((RING[0] - 12 - HW_RNG[1] - 10) * g), int((RING[1] + 12 + HW_RNG[1] + 10) * g))
+    th = np.linspace(0, 2 * np.pi, int(2 * np.pi * np.mean(RING) * g), endpoint=False)
+    P = cv2.remap(bold, (c + r[:, None] * np.cos(th)).astype(np.float32), (c + r[:, None] * np.sin(th)).astype(np.float32),
+                  cv2.INTER_LINEAR) > .5
+    seen = P.any(0)
+    lo = np.where(seen, P.argmax(0), 0).astype(float)
+    hi = np.where(seen, len(r) - 1 - P[::-1].argmax(0), 0).astype(float)
+    lo, hi = _flanks(P, lo, hi, g, len(th))
+    mid, wid = r[0] + (lo + hi) / 2, hi - lo
+    body = (wid > 2 * 35 * g) & (wid < 2 * (HW_RNG[1] + 15) * g) & (mid > (RING[0] - 25) * g) & (mid < (RING[1] + 25) * g)
+    w = int(.1 * len(th) / (2 * np.pi)) | 1  # bridge short breaks (a fin or pad bulging a flank); too-long runs get split below
+    body = minimum_filter(maximum_filter(body.astype(np.uint8), w, mode='wrap'), w, mode='wrap') > 0
+    if body.all() or not body.any():
+        return []
+    start = np.argmax(~body)  # unroll from a gap, so no koi straddles the seam
+    idx = np.roll(np.arange(len(th)), -start)
+    out, j = [], 0
+    while j < len(idx):
+        if not body[idx[j]]:
+            j += 1
+            continue
+        k = j
+        while k < len(idx) and body[idx[k]]:
+            k += 1
+        runs, done = [(j, k - 1, True, True)], []  # (first, last, extend at first, extend at last)
+        while runs:  # koi swimming nose to tail can merge into one run: split it where the body is narrowest
+            a, b, ea, eb = runs.pop()
+            m0 = int(.3 * len(th) / (2 * np.pi))
+            if (b - a + 1) * 2 * np.pi / len(th) > 1.1 and b - a > 2 * m0:
+                cut = a + m0 + int(np.argmin(wid[idx[a + m0:b - m0]]))
+                runs += [(a, cut - 1, ea, False), (cut + 1, b, False, eb)]
+            else:
+                done.append((a, b, ea, eb))
+        for a, b, ea, eb in done:
+            for step, ext in ((-1, ea), (1, eb)):  # out to the snout tip / tail base: narrower, same line
+                e0 = a if step < 0 else b
+                e1 = e0
+                for _ in range(int(.15 * len(th) / (2 * np.pi)) if ext else 0):
+                    q = idx[(e1 + step) % len(idx)]
+                    if not (seen[q] and 6 * g < wid[q] and abs(mid[q] - mid[idx[e1 % len(idx)]]) < 30 * g):
+                        break
+                    e1 += step
+                a, b = (e1, b) if step < 0 else (a, e1)
+            if .45 < (b - a + 1) * 2 * np.pi / len(th) < 1.1:
+                cols = idx[np.arange(a, b + 1) % len(idx)]
+                # a fin root bulges a flank over a narrow span of angle; snout and tail taper over a long one:
+                # 1-D grey closing of the inner flank / opening of the outer flank along the angle removes only bulges
+                L = int(.08 * len(th) / (2 * np.pi)) | 1
+                rl = r[0] + minimum_filter(maximum_filter(lo[cols], L, mode='nearest'), L, mode='nearest')
+                rh = r[0] + maximum_filter(minimum_filter(hi[cols], L, mode='nearest'), L, mode='nearest')
+                ang = th[cols]
+                poly = np.vstack([np.stack([c + rl * np.cos(ang), c + rl * np.sin(ang)], -1),
+                                  np.stack([c + rh * np.cos(ang), c + rh * np.sin(ang)], -1)[::-1]])
+                m = np.zeros(ink.shape, np.uint8)
+                cv2.fillPoly(m, [poly.round().astype(np.int32)], 1)
+                out.append(m)
+        j = k
+    return out
 
 
 def _resample_n(pts, n):
@@ -547,9 +654,91 @@ def _read_koi(ink, m):
     return None
 
 
+def _anchors(img):
+    """Corner bullseyes in a photo -> their 4 centres (full-res pixels, in ANCHORS order up to rotation), or None."""
+    f = min(1., 1000 / max(img.shape[:2]))
+    small = cv2.resize(img, None, fx=f, fy=f, interpolation=cv2.INTER_AREA) if f < 1 else img
+    b = (_ink(small, _odd(min(small.shape[:2]) // 25)) > .3).astype(np.uint8)  # wider than the centre dot, or it reads hollow
+    n, lab, st, _ = cv2.connectedComponentsWithStats(b, connectivity=8)
+    found = []
+    for i in range(1, n):
+        x, y, w, h, a = st[i]
+        if min(w, h) < 10 or not .5 < w / h < 2 or a < .15 * w * h:
+            continue
+        ring = np.pad(lab[y:y + h, x:x + w] == i, 1).astype(np.uint8)
+        outside = ring.copy()
+        cv2.floodFill(outside, None, (0, 0), 1)
+        hole = outside == 0
+        filled = ring.astype(bool) | hole
+        if not .25 < hole.sum() / filled.sum() < .85 or filled.sum() < .6 * np.pi / 4 * w * h:
+            continue
+        dot = hole & np.pad(b[y:y + h, x:x + w], 1).astype(bool)  # ink inside the hole: the centre dot
+        if not .03 < dot.sum() / filled.sum() < .3:
+            continue
+        ys, xs = np.nonzero(filled)
+        dy, dx = np.nonzero(dot)
+        c, cd = np.array([xs.mean(), ys.mean()]), np.array([dx.mean(), dy.mean()])
+        if np.linalg.norm(c - cd) > .2 * max(w, h):
+            continue
+        found.append((c + [x - 1, y - 1], np.sqrt(filled.sum())))
+    if len(found) < 3:
+        return None
+    found = sorted(found, key=lambda t: -t[1])[:8]
+    best, quad = 0, None
+    from itertools import combinations
+    for k in (4, 3):
+        for combo in combinations(found, k):
+            sz = [t[1] for t in combo]
+            if max(sz) > 2.5 * min(sz):
+                continue
+            pts = np.float32([t[0] for t in combo])
+            if k == 3:  # one corner lost: the right-angle vertex is opposite the longest side; complete the parallelogram
+                d = [np.linalg.norm(pts[(j + 1) % 3] - pts[(j + 2) % 3]) for j in range(3)]
+                j = int(np.argmax(d))
+                pts = np.vstack([pts, pts[(j + 1) % 3] + pts[(j + 2) % 3] - pts[j]])
+            hull = cv2.convexHull(pts)
+            area = cv2.contourArea(hull)
+            if len(hull) == 4 and _squareish(hull[:, 0]) and area > best:
+                best, quad = area, pts
+        if quad is not None:
+            break
+    if quad is None or best < .04 * small.shape[0] * small.shape[1]:
+        return None
+    m = quad.mean(0)
+    quad = quad[np.argsort(np.arctan2(quad[:, 1] - m[1], quad[:, 0] - m[0]))]  # TL, TR, BR, BL (image y down)
+    return quad / f
+
+
+def _squareish(q):
+    """A photo of the pond's square, however tilted, keeps every corner within 50..130 degrees and opposite sides within
+    a factor 1.8; a quad that picked up a lily pad's centre instead of a corner doesn't."""
+    for i in range(4):
+        a, b, c = q[i - 1], q[i], q[(i + 1) % 4]
+        u, v = a - b, c - b
+        if not 50 < np.degrees(np.arccos(np.clip(u @ v / np.linalg.norm(u) / np.linalg.norm(v), -1, 1))) < 130:
+            return False
+    sides = [np.linalg.norm(q[(i + 1) % 4] - q[i]) for i in range(4)]
+    return max(sides[0], sides[2]) < 1.8 * min(sides[0], sides[2]) and max(sides[1], sides[3]) < 1.8 * min(sides[1], sides[3])
+
+
+def _rectify(img):
+    """Unwarp the pond onto a RECT x RECT canvas via its corner anchors (anchors blanked); the photo as is without them."""
+    quad = _anchors(img)
+    if quad is None:
+        return img
+    H = cv2.getPerspectiveTransform(ANCHORS * (RECT / S), quad.astype(np.float32))
+    out = cv2.warpPerspective(img, H, (RECT, RECT), flags=cv2.INTER_LINEAR | cv2.WARP_INVERSE_MAP, borderMode=cv2.BORDER_REPLICATE)
+    c = int((ANCHOR_M + ANCHOR_R + 20) * RECT / S)  # koi never come near the corners
+    water = np.median(out.reshape(-1, 3)[::97], 0)  # the pond's water colour
+    for y0, x0 in ((0, 0), (0, RECT - c), (RECT - c, 0), (RECT - c, RECT - c)):
+        out[y0:y0 + c, x0:x0 + c] = water
+    return out
+
+
 def decode(img):
-    ink = _ink(img)
-    masks = _koi_masks(ink)
+    rect = _rectify(img)
+    ink = _ink(rect)
+    masks = _pond_masks(ink) if rect is not img else _koi_masks(ink)
     if not masks:
         return None
     ink = cv2.GaussianBlur(ink, (0, 0), max(.7, .05 * CELLS[0, 2] * np.mean(L_RNG) * np.sqrt(ink.size) / S))

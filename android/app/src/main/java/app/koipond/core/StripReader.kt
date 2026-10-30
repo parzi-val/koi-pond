@@ -16,8 +16,13 @@ object StripReader {
 
     /** Load once with koinn.onnx's bytes; until then KoiDecode reads the hatches classically. */
     fun load(model: ByteArray) {
-        if (session == null) session = OrtEnvironment.getEnvironment().createSession(model, OrtSession.SessionOptions())
+        if (session != null) return  // already loaded (an activity recreated keeps the process)
+        val t = System.nanoTime()
+        session = OrtEnvironment.getEnvironment().createSession(model, OrtSession.SessionOptions())
+        loadMs = (System.nanoTime() - t) / 1_000_000
     }
+
+    @Volatile var loadMs = -1L
 
     /** koi_data.strip: u (nose -> tail) along the width, v in +-V_SPAN body half-widths down the height. */
     fun strip(ink: FImg, fr: KoiDecode.Frame, out: FloatArray, at: Int) {

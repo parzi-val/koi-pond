@@ -11,6 +11,7 @@ from nn.train2 import BitReader
 from reedsolo import ReedSolomonError
 
 _NET = None
+RECTIFY = os.environ.get('KOI_RECTIFY', '1') != '0'
 
 
 def _net():
@@ -24,7 +25,8 @@ def _net():
 
 
 def decode(img):
-    ink, frames = front_end(img)
+    rect = koi._rectify(img) if RECTIFY else img
+    ink, frames = front_end(rect, ring=rect is not img)
     if not frames:
         return None
     x = 1 - torch.from_numpy(np.stack([strip(ink, fr) for fr in frames]))[:, None].float()

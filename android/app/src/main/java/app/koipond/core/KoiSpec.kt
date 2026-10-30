@@ -22,6 +22,13 @@ object KoiSpec {
     val C_RNG = .6 to .75
     val D_RNG = .6 to .85
     val K_RNG = .02 to .04
+    // corner anchors (koi.py ANCHORS): a bold ring + centre dot in each corner; the decoder unwarps the pond from them
+    const val ANCHOR_M = 125.0
+    const val ANCHOR_R = 80.0
+    const val ANCHOR_W = 20.0
+    const val ANCHOR_DOT = 26.0
+    val ANCHORS = listOf(P(ANCHOR_M, ANCHOR_M), P(S - ANCHOR_M, ANCHOR_M), P(S - ANCHOR_M, S - ANCHOR_M), P(ANCHOR_M, S - ANCHOR_M))
+    const val RECT = 1600  // side of the unwarped pond the decoder reads
     const val COLS = 24
     const val U0 = .22
     const val U1 = .88

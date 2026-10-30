@@ -25,7 +25,7 @@ object KoiDecode {
     /** What the scanner made of one silhouette (for drawing over the photo). */
     class KoiRead(val spine: Pts?, val index: Int?, val mirrored: Boolean)
 
-    class Result(val codeword: ByteArray, val erased: List<Int>, val kois: List<KoiRead>) {
+    class Result(val codeword: ByteArray, val erased: List<Int>, val kois: List<KoiRead>, val anchored: Boolean = false) {
         val read get() = kois.count { it.index != null }
     }
 
@@ -40,12 +40,13 @@ object KoiDecode {
 
     private fun odd(k: Int) = k or 1
 
-    fun inkMap(img: Rgb): FImg {
+    /** Darkness against the local background (a k x k closing; default: a little wider than any stroke). */
+    fun inkMap(img: Rgb, k: Int = odd(max(7, min(img.w, img.h) / 80))): FImg {
         val v = FImg(img.w, img.h, FloatArray(img.px.size) {
             val p = img.px[it]
             (max(max((p shr 16) and 0xff, (p shr 8) and 0xff), p and 0xff) + 1).toFloat()  // value channel: pale washes vanish
         })
-        val c = closeRect(v, odd(max(7, min(img.w, img.h) / 80)))
+        val c = closeRect(v, k)
         return FImg(img.w, img.h, FloatArray(v.a.size) { (1 - v.a[it] / c.a[it]).coerceIn(0f, 1f) })
     }
 
@@ -66,15 +67,10 @@ object KoiDecode {
         return out
     }
 
-    /** Stroke-erasing kernel: sized from the drawing (99th-percentile stroke half-width), measured on the
-     *  central half of the image (widths are the same everywhere; this keeps the distance transform cheap). */
+    /** Stroke-erasing kernel: sized from the drawing (99th-percentile stroke half-width, koi.py's chamfer distances),
+     *  measured over the whole image like koi.py (an unwarped pond keeps its koi outside the central half). */
     private fun strokeKernel(ink: FImg): Int {
-        val cw = ink.w / 2
-        val ch = ink.h / 2
-        val x0 = ink.w / 4
-        val y0 = ink.h / 4
-        val crop = ByteArray(cw * ch) { if (ink.a[(y0 + it / cw) * ink.w + x0 + it % cw] > .5f) 1 else 0 }
-        val dt = edt(crop, cw, ch)
+        val dt = chamfer3(ByteArray(ink.a.size) { if (ink.a[it] > .5f) 1 else 0 }, ink.w, ink.h)
         val maxDt = dt.a.maxOrNull() ?: 0f
         return if (maxDt > 0) min(8, (1.6 * percentile(dt.a, 99.0, maxDt + 1) { it > 0 }).toInt()) else 0
     }
@@ -144,13 +140,19 @@ object KoiDecode {
         })
     }
 
-    private fun koiMasksAt(ink: FImg): List<KMask> {
+    /** koi.py _bold on an already thin-stroke-opened ink map: relative threshold, then a small closing. */
+    private fun boldOf(ink: FImg): ByteArray {
         val w = ink.w
         val h = ink.h
         val b = Prof.sec("m.blur") { gaussBlur(ink, max(1.0, min(w, h) / 1500.0)) }
         val ell = ellipseOffsets(odd(max(3, min(w, h) / 600)))
-        val k = ell.dx.maxOrNull()!! * 2 + 1
-        val bold = Prof.sec("m.close") { binMorph(binMorph(above(b.a, .5f * percentile(b.a, 99.7, 1f)), w, h, ell, true), w, h, ell, false) }
+        return Prof.sec("m.close") { binMorph(binMorph(above(b.a, .5f * percentile(b.a, 99.7, 1f)), w, h, ell, true), w, h, ell, false) }
+    }
+
+    private fun koiMasksAt(ink: FImg, bold: ByteArray = boldOf(ink)): List<KMask> {
+        val w = ink.w
+        val h = ink.h
+        val k = odd(max(3, min(w, h) / 600))
         val raw = Prof.sec("m.fill") { fillHoles(bold, w, h) }
         val (lab, n) = Prof.sec("m.opendisc") { components(openDisc(raw, w, h, k + .5), w, h) }
         val st = stats(lab, n, w)
@@ -159,6 +161,30 @@ object KoiDecode {
         val best = score.maxOrNull() ?: 0
         if (best == 0) return emptyList()
         return Prof.sec("m.cut") { (1 until n).filter { score[it] > max(.35 * best, 1e-3 * w * h) }.map { cut(lab, it, raw, w, h, st) } }
+    }
+
+    /** koi.py _pond_masks: on an unwarped pond, closed outlines where they hold (exact), ring silhouettes for the koi
+     *  whose outline leaked. Only the disc the koi swim in counts (whatever got warped in past the pond's edge would
+     *  otherwise set the bold threshold). */
+    fun pondMasks(ink0: FImg): List<KMask> {
+        val n = ink0.w
+        val c = n / 2.0
+        val rr = 1120.0 * n / KoiSpec.S
+        val ink = FImg(n, n, FloatArray(n * n) { val dx = it % n - c; val dy = it / n - c; if (dx * dx + dy * dy < rr * rr) ink0.a[it] else 0f })
+        val ko = Prof.sec("m.edt") { strokeKernel(ink) }
+        val opened = Prof.sec("m.open") { if (ko >= 2) openGray(ink, ellipseOffsets(ko)) else ink }
+        val bold = boldOf(opened)
+        val filled = koiMasksAt(opened, bold)
+        val ring = Prof.sec("m.ring") { Ring.masks(bold, n) }
+        return filled + ring.filter { m -> filled.none { overlap(m, it) > .3 * m.area() } }
+    }
+
+    private fun KMask.area() = a.count { it.toInt() != 0 }
+    private fun overlap(p: KMask, q: KMask): Int {
+        var s = 0
+        for (y in max(p.y0, q.y0) until min(p.y0 + p.h, q.y0 + q.h)) for (x in max(p.x0, q.x0) until min(p.x0 + p.w, q.x0 + q.w))
+            if (p.at(x, y) && q.at(x, y)) s++
+        return s
     }
 
     class Frame(val sp: Pts, val nrm: Pts, val len: Double, val mid: DoubleArray, val half: DoubleArray) {
@@ -366,9 +392,12 @@ object KoiDecode {
     }
 
     /** fullRes: look for silhouettes at full resolution too (slower; a fallback for hard photos). */
-    fun decode(img: Rgb, fullRes: Boolean = false, onKoi: (List<KoiRead>, Int) -> Unit = { _, _ -> }): Result? {
+    fun decode(photo: Rgb, fullRes: Boolean = false, onKoi: (List<KoiRead>, Int) -> Unit = { _, _ -> }): Result? {
+        // corner anchors seen: read the unwarped pond (spines reported back in photo pixels); else the photo as is
+        val rect = Prof.sec("d.anchors") { Anchors.rectify(photo) }
+        val img = rect?.img ?: photo
         val ink0 = Prof.sec("d.ink") { inkMap(img) }
-        val masks = Prof.sec("d.masks") { koiMasks(ink0, fullRes) }
+        val masks = Prof.sec("d.masks") { if (rect != null) pondMasks(ink0) else koiMasks(ink0, fullRes) }
         if (masks.isEmpty()) return null
         val sigma = max(.7, .05 * CELLS[0].du * (KoiSpec.L_RNG.first + KoiSpec.L_RNG.second) / 2 * sqrt((img.w * img.h).toDouble()) / KoiSpec.S)
         val ink = Prof.sec("d.blur") { gaussBlur(ink0, sigma) }
@@ -385,7 +414,8 @@ object KoiDecode {
                 else -> readKoi(ink, fr)
             }
             if (r.index != null && chunk != null) chunks.putIfAbsent(r.index, chunk)
-            reads += r
+            val sp = r.spine
+            reads += if (rect != null && sp != null) KoiRead(Pts.of(sp.n) { rect.toPhoto(sp[it]) }, r.index, r.mirrored) else r
             onKoi(reads.toList(), masks.size)
         }
         val code = ByteArray(NF * CHUNK)
@@ -394,6 +424,6 @@ object KoiDecode {
             val ch = chunks[f]
             for (i in 0 until CHUNK) if (ch != null) code[f + i * NF] = ch[i] else erased += f + i * NF
         }
-        return Result(code, erased.sorted(), reads)
+        return Result(code, erased.sorted(), reads, rect != null)
     }
 }

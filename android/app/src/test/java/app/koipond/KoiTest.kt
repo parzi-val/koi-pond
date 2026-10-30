@@ -65,4 +65,17 @@ class KoiTest {
         println("read: '${s.text}' (${s.result?.read}/${s.result?.kois?.size} koi) ${System.currentTimeMillis() - t} ms | ${app.koipond.core.Prof.report()}")
         assertEquals(text, s.text)
     }
+
+    @Test
+    fun findsAnchorsLikePython() {  // a simulated phone photo from anchor_bench.py, with koi.py's anchor centres
+        val want = File(fx, "py_anchor_photo.txt").readText().trim().split(" ").map { it.toDouble() }
+        val got = app.koipond.core.Anchors.find(load("py_anchor_photo.jpg"))!!
+        for (i in 0..3) assertTrue("anchor $i at ${got[i]}", kotlin.math.hypot(got[i].x - want[2 * i], got[i].y - want[2 * i + 1]) < 3.0)
+    }
+
+    @Test
+    fun findsKoiOnARealPhoto() {  // a Koi Lab frame (phone photo of a screen): koi.py's _pond_masks finds all 6
+        val rect = app.koipond.core.Anchors.rectify(load("lab_frame.jpg"))!!
+        assertEquals(6, KoiDecode.pondMasks(KoiDecode.inkMap(rect.img)).size)
+    }
 }

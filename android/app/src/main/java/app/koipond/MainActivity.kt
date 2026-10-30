@@ -7,6 +7,7 @@ import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import app.koipond.core.StripReader
 import app.koipond.ui.KoiApp
+import app.koipond.ui.LabScreen
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -18,6 +19,6 @@ class MainActivity : ComponentActivity() {
             Log.i("koipond", "strip reader loaded in ${(System.nanoTime() - t) / 1_000_000} ms")
         }.start()
         enableEdgeToEdge()
-        setContent { KoiApp() }
+        setContent { if (BuildConfig.LAB) LabScreen() else KoiApp() }
     }
 }

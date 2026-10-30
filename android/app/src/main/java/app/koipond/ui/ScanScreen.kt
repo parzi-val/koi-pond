@@ -77,7 +77,7 @@ import kotlin.coroutines.resumeWithException
 import kotlin.math.max
 
 /** One full-resolution frame, upright. */
-private suspend fun ImageCapture.grab(ctx: Context): Bitmap = suspendCancellableCoroutine { cont ->
+internal suspend fun ImageCapture.grab(ctx: Context): Bitmap = suspendCancellableCoroutine { cont ->
     takePicture(ContextCompat.getMainExecutor(ctx), object : ImageCapture.OnImageCapturedCallback() {
         override fun onCaptureSuccess(image: ImageProxy) {
             val b = image.toBitmap().rotated(image.imageInfo.rotationDegrees)
@@ -178,7 +178,7 @@ fun ScanScreen(app: AppState, scope: CoroutineScope) {
 }
 
 @Composable
-private fun CameraPreview(capture: ImageCapture, onCamera: (Camera) -> Unit) {
+internal fun CameraPreview(capture: ImageCapture, onCamera: (Camera) -> Unit) {
     val ctx = LocalContext.current
     val owner = LocalLifecycleOwner.current
     val view = remember { PreviewView(ctx).apply { scaleType = PreviewView.ScaleType.FILL_CENTER } }

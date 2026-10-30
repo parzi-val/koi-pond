@@ -280,6 +280,13 @@ object KoiRender {
         val leaf = Mask(S, S)
         val stone = Mask(S, S)
 
+        for (c in KoiSpec.ANCHORS) {  // anchors first: stones and reeds keep clear of them
+            stone.fillCircle(c.x, c.y, KoiSpec.ANCHOR_R + 8)
+            ink.ring(c, KoiSpec.ANCHOR_R, KoiSpec.ANCHOR_W)
+            ink.disc(c, KoiSpec.ANCHOR_DOT)
+            fp.fillCircle(c.x / q, c.y / q, (KoiSpec.ANCHOR_R + 24) / q)
+        }
+
         Prof.sec("r.stones") {
         // stone rim: rounded stones along the pond edge, wherever no koi or fin reaches
         val per = ArrayList<P>()

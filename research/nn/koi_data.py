@@ -32,10 +32,11 @@ def strip(ink, fr):
     return cv2.remap(ink, X.astype(np.float32), Y.astype(np.float32), cv2.INTER_LINEAR, borderValue=0)
 
 
-def front_end(img):
-    """The classical decoder up to the read: blurred ink map and one head-first frame per koi found."""
+def front_end(img, ring=False):
+    """The classical decoder up to the read: blurred ink map and one head-first frame per koi found.
+    ring: img is an unwarped pond (koi._rectify), so find the koi on their ring."""
     ink = koi._ink(img)
-    masks = koi._koi_masks(ink)
+    masks = koi._pond_masks(ink) if ring else koi._koi_masks(ink)
     ink = cv2.GaussianBlur(ink, (0, 0), max(.7, .05 * koi.CELLS[0, 2] * np.mean(koi.L_RNG) * np.sqrt(ink.size) / koi.S))
     frames = []
     for m in masks:

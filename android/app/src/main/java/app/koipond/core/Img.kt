@@ -212,6 +212,40 @@ fun openGray(src: FImg, offs: Offs): FImg {
     return FImg(src.w, src.h, pass(pass(src.a, false), true))
 }
 
+/** cv2.distanceTransform(DIST_L2, 3): the 3x3 chamfer approximation (a = .955, b = 1.3693) that koi.py's stroke-width
+ *  estimate is tuned on; its distances differ a little from the exact transform, enough to move a 1.6 x percentile. */
+fun chamfer3(mask: ByteArray, w: Int, h: Int): FImg {
+    val a = .955f
+    val b = 1.3693f
+    val inf = 1e9f
+    val d = FloatArray(w * h) { if (mask[it].toInt() != 0) inf else 0f }
+    for (y in 0 until h) for (x in 0 until w) {
+        val i = y * w + x
+        if (d[i] == 0f) continue
+        var v = d[i]
+        if (x > 0) v = min(v, d[i - 1] + a)
+        if (y > 0) {
+            v = min(v, d[i - w] + a)
+            if (x > 0) v = min(v, d[i - w - 1] + b)
+            if (x < w - 1) v = min(v, d[i - w + 1] + b)
+        }
+        d[i] = v
+    }
+    for (y in h - 1 downTo 0) for (x in w - 1 downTo 0) {
+        val i = y * w + x
+        if (d[i] == 0f) continue
+        var v = d[i]
+        if (x < w - 1) v = min(v, d[i + 1] + a)
+        if (y < h - 1) {
+            v = min(v, d[i + w] + a)
+            if (x < w - 1) v = min(v, d[i + w + 1] + b)
+            if (x > 0) v = min(v, d[i + w - 1] + b)
+        }
+        d[i] = v
+    }
+    return FImg(w, h, d)
+}
+
 /** Exact Euclidean distance from every nonzero pixel to the nearest zero pixel (Felzenszwalb-Huttenlocher). */
 fun edt(mask: ByteArray, w: Int, h: Int): FImg {
     val inf = 1e20
@@ -247,8 +281,8 @@ fun edt(mask: ByteArray, w: Int, h: Int): FImg {
     return FImg(w, h, FloatArray(w * h) { sqrt(f[it]).toFloat() })
 }
 
-/** 4-connected components of nonzero pixels: labels (0 = background) and count+1. */
-fun components(mask: ByteArray, w: Int, h: Int): Pair<IntArray, Int> {
+/** 4-connected (or 8-connected) components of nonzero pixels: labels (0 = background) and count+1. */
+fun components(mask: ByteArray, w: Int, h: Int, eight: Boolean = false): Pair<IntArray, Int> {
     val lab = IntArray(w * h)
     val q = IntArray(w * h)
     var n = 1
@@ -266,6 +300,10 @@ fun components(mask: ByteArray, w: Int, h: Int): Pair<IntArray, Int> {
             if (x < w - 1 && mask[p + 1].toInt() != 0 && lab[p + 1] == 0) { lab[p + 1] = n; q[tail++] = p + 1 }
             if (y > 0 && mask[p - w].toInt() != 0 && lab[p - w] == 0) { lab[p - w] = n; q[tail++] = p - w }
             if (y < h - 1 && mask[p + w].toInt() != 0 && lab[p + w] == 0) { lab[p + w] = n; q[tail++] = p + w }
+            if (eight) for (dy in intArrayOf(-1, 1)) for (dx in intArrayOf(-1, 1)) {
+                val o = p + dy * w + dx
+                if (x + dx in 0 until w && y + dy in 0 until h && mask[o].toInt() != 0 && lab[o] == 0) { lab[o] = n; q[tail++] = o }
+            }
         }
         n++
     }
