@@ -319,10 +319,24 @@ object KoiDecode {
         return acc / (to - from)
     }
 
-    private fun readKoi(ink: FImg, m: KMask): Pair<KoiRead, ByteArray?> {
-        val sp = Prof.sec("d.spine") { spine(m) } ?: return KoiRead(null, null, false) to null
-        // head end: koi are broad-shouldered and taper hard to the tail stalk
-        val fr = listOf(frame(m, sp), frame(m, sp.reversed())).maxBy { f -> f.half.copyOfRange(10, 41).average() - f.half.copyOfRange(160, 191).average() }
+    /** Spine and frame running nose -> tail. Head end: koi are broad-shouldered and taper hard to the tail stalk. */
+    private fun headFrame(m: KMask): Frame? {
+        val sp = Prof.sec("d.spine") { spine(m) } ?: return null
+        return listOf(frame(m, sp), frame(m, sp.reversed())).maxBy { f -> f.half.copyOfRange(10, 41).average() - f.half.copyOfRange(160, 191).average() }
+    }
+
+    /** The first candidate bit set (canonical order) that passes the inner RS -> koi index and chunk. */
+    private fun inner(fr: Frame, candidates: List<Pair<Boolean, IntArray>>): Pair<KoiRead, ByteArray?> {
+        for ((mir, bits) in candidates) {
+            val bytes = ByteArray(FISH_BITS / 8) { i -> var v = 0; for (j in 0..7) v = (v shl 1) or bits[i * 8 + j]; v.toByte() }
+            val msg = try { Rs.decode(bytes, KoiSpec.INNER_NSYM) } catch (e: RsException) { continue }
+            val head = msg[0].toInt() and 0xff
+            if (head shr 4 == 0xA && (head and 15) < NF) return KoiRead(fr.sp, head and 15, mir) to msg.copyOfRange(1, msg.size)
+        }
+        return KoiRead(fr.sp, null, false) to null
+    }
+
+    private fun readKoi(ink: FImg, fr: Frame): Pair<KoiRead, ByteArray?> {
         var off = Array(COLS) { DoubleArray(4) }
         for (step in doubleArrayOf(1.0, .4)) Prof.sec("d.tracking") {  // local tracking: shift, slant, stretch per column, coarse then fine
             off = Array(COLS) { col ->
@@ -348,13 +362,7 @@ object KoiDecode {
             val ventral = curve(ink, fr, k, o, HATCH_U, HATCH_V, 1.0, 0, 18)
             if (dorsal > ventral) 1 else 0
         }
-        for ((mir, bits) in listOf(false to canon, true to IntArray(CELLS.size) { 1 - canon[KoiSpec.MIRROR[it]] })) {
-            val bytes = ByteArray(FISH_BITS / 8) { i -> var v = 0; for (j in 0..7) v = (v shl 1) or bits[i * 8 + j]; v.toByte() }
-            val msg = try { Rs.decode(bytes, KoiSpec.INNER_NSYM) } catch (e: RsException) { continue }
-            val head = msg[0].toInt() and 0xff
-            if (head shr 4 == 0xA && (head and 15) < NF) return KoiRead(fr.sp, head and 15, mir) to msg.copyOfRange(1, msg.size)
-        }
-        return KoiRead(fr.sp, null, false) to null
+        return inner(fr, listOf(false to canon, true to IntArray(CELLS.size) { 1 - canon[KoiSpec.MIRROR[it]] }))
     }
 
     /** fullRes: look for silhouettes at full resolution too (slower; a fallback for hard photos). */
@@ -364,10 +372,18 @@ object KoiDecode {
         if (masks.isEmpty()) return null
         val sigma = max(.7, .05 * CELLS[0].du * (KoiSpec.L_RNG.first + KoiSpec.L_RNG.second) / 2 * sqrt((img.w * img.h).toDouble()) / KoiSpec.S)
         val ink = Prof.sec("d.blur") { gaussBlur(ink0, sigma) }
+        val frames = masks.map { headFrame(it) }
+        // the learned reader (when loaded) reads every koi in one batch; otherwise track and read the hatches
+        val learned = if (StripReader.ready && frames.any { it != null })
+            Prof.sec("d.reader") { StripReader.read(ink, frames.filterNotNull()) }.iterator() else null
         val chunks = HashMap<Int, ByteArray>()
         val reads = ArrayList<KoiRead>()
-        for (m in masks) {  // report after every koi, so a UI can show them being read one by one
-            val (r, chunk) = readKoi(ink, m)
+        for (fr in frames) {  // report after every koi, so a UI can show them being read one by one
+            val (r, chunk) = when {
+                fr == null -> KoiRead(null, null, false) to null
+                learned != null -> learned.next().let { (asIs, flipped) -> inner(fr, listOf(false to asIs, true to flipped)) }
+                else -> readKoi(ink, fr)
+            }
             if (r.index != null && chunk != null) chunks.putIfAbsent(r.index, chunk)
             reads += r
             onKoi(reads.toList(), masks.size)

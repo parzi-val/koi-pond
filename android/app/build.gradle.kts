@@ -15,6 +15,7 @@ android {
         targetSdk = 36
         versionCode = 1
         versionName = "1.0"
+        ndk { abiFilters += "arm64-v8a" }  // ONNX Runtime is ~35 MB of natives per ABI; phones only (add x86_64 for an emulator)
     }
 
     buildTypes {
@@ -32,6 +33,7 @@ android {
     buildFeatures {
         compose = true
     }
+    packaging { jniLibs.useLegacyPackaging = true }  // compress the natives: ~35 MB -> ~12 MB in the APK
     testOptions {
         unitTests.all { it.jvmArgs("-Xmx4g") }
     }
@@ -49,5 +51,6 @@ dependencies {
     implementation(libs.androidx.camera.lifecycle)
     implementation(libs.androidx.camera.view)
     implementation(libs.androidx.lifecycle.runtime.compose)
+    implementation(libs.onnxruntime.android)
     testImplementation(libs.junit)
 }

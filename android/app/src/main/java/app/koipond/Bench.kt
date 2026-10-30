@@ -3,6 +3,7 @@ package app.koipond
 import app.koipond.core.KoiDecode
 import app.koipond.core.Prof
 import app.koipond.core.Rgb
+import app.koipond.core.StripReader
 import java.io.DataInputStream
 import java.io.File
 import java.nio.ByteBuffer
@@ -11,6 +12,9 @@ import java.nio.ByteOrder
 /**
  * Decoder benchmark for the phone, no UI or camera: run from adb with the APK as classpath,
  *   adb shell CLASSPATH=/data/local/tmp/koi.apk app_process / app.koipond.Bench /data/local/tmp/bench [runs]
+ * With koinn.onnx in the folder the learned reader is used (classical hatch read without it). app_process can't
+ * see the APK's natives: push lib/arm64-v8a/*.so to /data/local/tmp/lib and add
+ *   LD_LIBRARY_PATH=/data/local/tmp/lib ... app_process -Djava.library.path=/data/local/tmp/lib ...
  * Every NAME.rgb in the folder (int32 LE w, h, then w*h RGB bytes) is decoded `runs` times after one
  * warm-up, and checked against NAME.hex (the expected outer codeword).
  */
@@ -19,7 +23,8 @@ object Bench {
     fun main(args: Array<String>) {
         val dir = File(args[0])
         val runs = args.getOrNull(1)?.toInt() ?: 3
-        println("cores ${Runtime.getRuntime().availableProcessors()}  max heap ${Runtime.getRuntime().maxMemory() / 1_000_000} MB")
+        File(dir, "koinn.onnx").takeIf { it.exists() }?.let { StripReader.load(it.readBytes()) }
+        println("cores ${Runtime.getRuntime().availableProcessors()}  max heap ${Runtime.getRuntime().maxMemory() / 1_000_000} MB  reader ${if (StripReader.ready) "learned" else "classical"}")
         for (f in dir.listFiles { p -> p.name.endsWith(".rgb") }!!.sortedBy { it.name }) {
             val img = load(f)
             val want = File(dir, f.name.removeSuffix(".rgb") + ".hex").readText().trim()
