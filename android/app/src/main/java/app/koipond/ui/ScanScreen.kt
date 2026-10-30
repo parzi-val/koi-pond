@@ -63,6 +63,8 @@ import androidx.compose.ui.viewinterop.AndroidView
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import app.koipond.core.KoiCodec
+import app.koipond.core.Prof
+import app.koipond.core.StripReader
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
@@ -118,6 +120,8 @@ fun ScanScreen(app: AppState, scope: CoroutineScope) {
                     }
                 }
             }
+            Log.i("koipond", "scan ${rgb.w}x${rgb.h} ${if (StripReader.ready) "learned" else "classical"}: " +
+                "${scan.result?.read ?: 0} koi, ${if (scan.text != null) "message" else "no message"}  ${Prof.report()}")
             if (scan.text != null) {
                 app.scanText = scan.text
                 app.scanAll = scan.result?.read ?: 6

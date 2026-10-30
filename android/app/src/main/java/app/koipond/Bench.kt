@@ -13,7 +13,7 @@ import java.nio.ByteOrder
  * Decoder benchmark for the phone, no UI or camera: run from adb with the APK as classpath,
  *   adb shell CLASSPATH=/data/local/tmp/koi.apk app_process / app.koipond.Bench /data/local/tmp/bench [runs]
  * With koinn.onnx in the folder the learned reader is used (classical hatch read without it). app_process can't
- * see the APK's natives: push lib/arm64-v8a/*.so to /data/local/tmp/lib and add
+ * see the APK's natives: push the .so files from the APK's lib/arm64-v8a to /data/local/tmp/lib and add
  *   LD_LIBRARY_PATH=/data/local/tmp/lib ... app_process -Djava.library.path=/data/local/tmp/lib ...
  * Every NAME.rgb in the folder (int32 LE w, h, then w*h RGB bytes) is decoded `runs` times after one
  * warm-up, and checked against NAME.hex (the expected outer codeword).
